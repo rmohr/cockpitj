@@ -4,10 +4,10 @@ cockpitj
 A java websocket client for the great [cockpit-project](http://cockpit-project.org/).
 
 This library is currently just a proof of concept. It allows you to connect to cockpit and exchange plain string 
-messages.
+messages. Further a cockpit debugging tool is included which works almost the same way like a [local interactive cockpit-bridge](http://stef.thewalter.net/protocol-for-web-access-to-system-apis.html) session.
 
 Usage
--------
+-----
 
 Build the project and install it into your local maven repository:
 
@@ -76,14 +76,15 @@ mvn clean install
 cd debugger
 mvn clean compile exec:java
 ```
-By default the debugger uses the location and the credentials of the vagrant developer machine provided by cockpit.
-To override them you can use system properties:
+By default the debugger uses the location and the credentials of the vagrant developer machine provided by cockpit. The debugger tool expects TLS to be disabled. See the section _Java and TLS_ on how to do that or how to configure java so that it will accept the custom certificate provided by cockpit.
+
+To override the default connection values you can use system properties:
 
 ```bash
 mvn clean compile exec:java -Durl=wss://localhost:9090/cockpit -Duser=root -Dpassword=foobar
 ```
 
-When you are successfully connected you will see the welcome message of cockpit which looks like this:
+When you are successfully connected you will see cockpits welcome message:
 
 ```json
 {"command":"init","version":1,"channel-seed":"1:","host":"localhost", [...]}
@@ -120,3 +121,31 @@ mychannel
 
 To find out more about the cockpit websocket protocol visit the [documentation on github]
 (https://github.com/cockpit-project/cockpit/blob/master/doc/protocol.md).
+
+Run cockpit with vagrant
+------------------------
+The [HACKING.md](https://github.com/cockpit-project/cockpit/blob/master/HACKING.md) in the cockpit repository describes pretty well on how to quickly setup a development instance of cockpit.
+
+On Fedora 22/23 you can run
+
+```bash
+sudo dnf install vagrant vagrant-libvirt
+git clone git@github.com:cockpit-project/cockpit.git
+cd cockpit
+sudo vagrant up
+```
+After the bootstrap is done the service is accessible at [https://localhost:9090/cockpit](https://localhost:9090/cockpit) and the websocket is accessible at [wss://localhost:9090/cockpit/socket](https://localhost:9090/cockpit/socket). For both users _admin_ and _root_ the password _foobar_ is set by default.
+
+Java and TLS
+------------
+Cockpit only accepts secured connections by default. Because it is using a self signed certificate if no certifiacte is set up by an administrator cockpitj will complain about invalid or missing certificates. You can either copy the certificate over from the vagrant machine and make it accessible to the java certificate store, or you tell _cockpit-ws_ to not use TLS.
+
+To disable TLS, login into the vagrant and add the parameter `--no-tls` to the systemd service file.
+```
+sed -i -e "s#/usr/libexec/cockpit-ws#/usr/libexec/cockpit-ws --no-tls#" /usr/lib/systemd/system/cockpit.service
+systemctl daemon-reload
+systemctl restart cockpit
+```
+To make this a persistent configuration you can add something like this to the `Vagrantfile` in the cockpit repo.
+
+After restarting the service you can access the service at [http://localhost:9090/cockpit](http://localhost:9090/cockpit). Use [ws://localhost:9090/cockpit/socket](https://localhost:9090/cockpit/socket) to access the socket.
