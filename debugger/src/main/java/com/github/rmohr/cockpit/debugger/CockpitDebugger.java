@@ -28,9 +28,9 @@ public class CockpitDebugger {
         final String url = System.getProperty("url", "wss://localhost:9090/cockpit");
         final String user = System.getProperty("user", "root");
         final String password = System.getProperty("password", "foobar");
-        final String checkCertifiactes = System.getProperty("checkCertificates", "false");
+        final String checkCertificates = System.getProperty("checkCertificates", "false");
         Client clientEndpoint;
-        if (checkCertifiactes.equals(true)) {
+        if (checkCertificates.equals(true)) {
             clientEndpoint = new Client(url, user, password, new ConsoleMessageHandler());
         } else {
             clientEndpoint = new Client(createInsecureSocketContainer(),
