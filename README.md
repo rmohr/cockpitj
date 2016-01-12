@@ -29,13 +29,13 @@ Then include the maven dependency
 
 in your project.
 
-The included debugging tool uses cockpitj to talk to cockpit. The following example shows the main method of the 
-debugger:
+The following example shows a minimal possible lient which reads from and writes to a terminal:
 
 ```java
 import com.github.rmohr.cockpit.client.Client;
 
 final Client client = new Client(url, user, password, new ConsoleMessageHandler());
+client.connect();
 
 final Scanner scanner = new Scanner(System.in);
 scanner.useDelimiter(Pattern.compile("[\\r\\n;]+"));
@@ -51,19 +51,20 @@ while (true) {
 }
 ```
 
-The line
+The lines
 
 ```java
 final Client client = new Client(url, user, password, new ConsoleMessageHandler());
+client.connect()
 ```
 
-establishes the connection to cockpit. The line 
+are establishing the connection to cockpit. The line 
 
 ```java
 client.sendMessage(message);
 ```
 
-sends a text message to cockpit.
+sends a message to cockpit.
 
 Debugging
 ---------
@@ -76,12 +77,13 @@ mvn clean install
 cd debugger
 mvn clean compile exec:java
 ```
-By default the debugger uses the location and the credentials of the vagrant developer machine provided by cockpit. The debugger tool expects TLS to be disabled. See the section _Java and TLS_ on how to do that or how to configure java so that it will accept the custom certificate provided by cockpit.
+By default the debugger uses the location and the credentials of the vagrant developer machine provided by cockpit 
+and does not verify the TLS certificates to allow easy debugging.
 
 To override the default connection values you can use system properties:
 
 ```bash
-mvn clean compile exec:java -Durl=wss://localhost:9090/cockpit -Duser=root -Dpassword=foobar
+mvn clean compile exec:java -Durl=wss://localhost:9090/cockpit -Duser=root -Dpassword=foobar -DcheckCertificates=false
 ```
 
 When you are successfully connected you will see cockpits welcome message:
@@ -136,16 +138,7 @@ sudo vagrant up
 ```
 After the bootstrap is done the service is accessible at [https://localhost:9090/cockpit](https://localhost:9090/cockpit) and the websocket is accessible at [wss://localhost:9090/cockpit/socket](https://localhost:9090/cockpit/socket). For both users _admin_ and _root_ the password _foobar_ is set by default.
 
-Java and TLS
-------------
-Cockpit only accepts secured connections by default. Because it is using a self signed certificate if no certifiacte is set up by an administrator cockpitj will complain about invalid or missing certificates. You can either copy the certificate over from the vagrant machine and make it accessible to the java certificate store, or you tell _cockpit-ws_ to not use TLS.
+Run tests
+---------
 
-To disable TLS, login into the vagrant and add the parameter `--no-tls` to the systemd service file.
-```
-sed -i -e "s#/usr/libexec/cockpit-ws#/usr/libexec/cockpit-ws --no-tls#" /usr/lib/systemd/system/cockpit.service
-systemctl daemon-reload
-systemctl restart cockpit
-```
-To make this a persistent configuration you can add something like this to the `Vagrantfile` in the cockpit repo.
-
-After restarting the service you can access the service at [http://localhost:9090/cockpit](http://localhost:9090/cockpit). Use [ws://localhost:9090/cockpit/socket](https://localhost:9090/cockpit/socket) to access the socket.
+The tests require a cockpit instance accessible at [https://localhost:9090/cockpit](https://localhost:9090/cockpit). 

@@ -1,8 +1,11 @@
 package com.github.rmohr.cockpit.client;
 
+import static java.util.Objects.requireNonNull;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 import javax.websocket.ClientEndpointConfig;
@@ -37,35 +40,48 @@ public class Client extends javax.websocket.Endpoint {
     private static final String COCKPIT_PROTOCOL = "cockpit1";
     private static final String LOGIN_PATH = "/login";
     private static final String SOCKET_PATH = "/socket";
+    private final CloseableHttpClient httpClient;
+    private final WebSocketContainer client;
+    private final String endpointURI;
     private Session userSession;
     private MessageHandler messageHandler;
 
-    public Client(String endpointURI, String username, String password, MessageHandler messageHandler)
-            throws IOException,
-            DeploymentException,
-            URISyntaxException, AuthenticationException {
-        WebSocketContainer client = ContainerProvider
-                .getWebSocketContainer();
+    public Client(WebSocketContainer client,
+            CloseableHttpClient httpClient,
+            String endpointURI,
+            MessageHandler messageHandler) {
+        requireNonNull(httpClient);
+        requireNonNull(messageHandler);
+        requireNonNull(endpointURI);
+        requireNonNull(client);
+        this.httpClient = httpClient;
         this.messageHandler = messageHandler;
-        connect(client, endpointURI, username, password);
+        this.client = client;
+        this.endpointURI = endpointURI;
     }
 
-    public Client(WebSocketContainer client,
+    public Client(
             String endpointURI,
             String username,
             String password,
-            MessageHandler messageHandler)
-            throws IOException, DeploymentException, URISyntaxException, AuthenticationException {
+            MessageHandler messageHandler) {
+        requireNonNull(endpointURI);
+        requireNonNull(username);
+        requireNonNull(password);
         this.messageHandler = messageHandler;
-        connect(client, endpointURI, username, password);
+        this.client = ContainerProvider.getWebSocketContainer();
+        this.endpointURI = endpointURI;
+        this.httpClient = defaultHttpClient(username, password);
     }
 
-    private void connect(WebSocketContainer client, String endpointURI, String username, String password)
-            throws URISyntaxException, IOException, DeploymentException, AuthenticationException {
+    public void connect() throws URISyntaxException, NoSuchAlgorithmException, IOException, AuthenticationException,
+            DeploymentException {
         final URI loginPath = getLoginPath(endpointURI);
         final URI socketPath = getSocketPath(endpointURI);
         client.connectToServer(this, ClientEndpointConfig.Builder.create()
-                        .configurator(new SessionConfigurator(login(loginPath, username, password)))
+                        .configurator(new SessionConfigurator(login(loginPath),
+                                endpointURI.startsWith(
+                                        "wss")))
                         .preferredSubprotocols(Arrays.asList(COCKPIT_PROTOCOL))
                         .build(),
                 socketPath);
@@ -88,10 +104,6 @@ public class Client extends javax.websocket.Endpoint {
         this.userSession.getAsyncRemote().sendText(message);
     }
 
-    public void onMessage(String message) {
-        log.info(message);
-    }
-
     private URI getSocketPath(String baseUri) throws URISyntaxException {
         if (baseUri.endsWith("/")) {
             baseUri = baseUri.substring(0, baseUri.length() - 2);
@@ -111,13 +123,16 @@ public class Client extends javax.websocket.Endpoint {
         return new URI(baseUri + LOGIN_PATH);
     }
 
-    private String login(URI endpointURI, String username, String password) throws IOException,
-            AuthenticationException {
-        HttpHost host = new HttpHost(endpointURI.getHost(), endpointURI.getPort(), endpointURI.getScheme());
+    private static CloseableHttpClient defaultHttpClient(String username, String password) {
         CredentialsProvider credProvider = new BasicCredentialsProvider();
-        credProvider.setCredentials(new AuthScope(endpointURI.getHost(), endpointURI.getPort()),
+        credProvider.setCredentials(AuthScope.ANY,
                 new UsernamePasswordCredentials(username, password));
-        CloseableHttpClient httpClient = HttpClients.custom().setDefaultCredentialsProvider(credProvider).build();
+        return HttpClients.custom().setDefaultCredentialsProvider(credProvider).build();
+    }
+
+    private String login(URI endpointURI) throws IOException,
+            AuthenticationException, NoSuchAlgorithmException {
+        HttpHost host = new HttpHost(endpointURI.getHost(), endpointURI.getPort(), endpointURI.getScheme());
         HttpGet httpGet = new HttpGet(endpointURI.getRawPath());
 
         AuthCache authCache = new BasicAuthCache();
