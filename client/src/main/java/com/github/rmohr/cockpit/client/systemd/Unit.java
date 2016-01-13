@@ -3,14 +3,16 @@ package com.github.rmohr.cockpit.client.systemd;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 
 @Value
+@EqualsAndHashCode(of = {"name"})
 public class Unit {
 
     @JsonCreator
     public Unit(List<String> properties) {
-        unit = properties.get(0);
+        name = properties.get(0);
         description = properties.get(1);
         load = properties.get(2);
         active = properties.get(3);
@@ -18,7 +20,7 @@ public class Unit {
         objectPath = properties.get(6);
     }
 
-    private String unit;
+    private String name;
 
     private String description;
 

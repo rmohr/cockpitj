@@ -16,7 +16,7 @@ public abstract class OpenCommandBuilder<T> {
 
     private T self;
     protected Map<String, Object> command = new HashMap<>();
-    private ObjectMapper objectMapper;
+    protected ObjectMapper objectMapper;
 
     protected OpenCommandBuilder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
