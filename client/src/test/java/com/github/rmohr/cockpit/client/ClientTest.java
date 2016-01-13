@@ -1,38 +1,51 @@
 package com.github.rmohr.cockpit.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.websocket.DeploymentException;
-import javax.websocket.WebSocketContainer;
 
 import org.apache.http.auth.AuthenticationException;
-import org.glassfish.tyrus.client.ClientManager;
-import org.glassfish.tyrus.client.ClientProperties;
-import org.glassfish.tyrus.client.SslEngineConfigurator;
 import org.junit.Test;
 
-public class ClientTest {
+import com.github.rmohr.cockpit.client.com.github.rmohr.cockpit.client.channel.ControlCommandFactory;
+import com.github.rmohr.cockpit.client.com.github.rmohr.cockpit.client.channel.DbusOpenCommandBuilder;
+import com.github.rmohr.cockpit.client.com.github.rmohr.cockpit.client.channel.QueuingMessageHandler;
+import com.jayway.jsonpath.JsonPath;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class ClientTest extends ClientTestBase {
 
     @Test
-    public void testConnection() throws URISyntaxException, IOException, DeploymentException, KeyManagementException,
+    public void shouldConnectSuccessfullyWithTls() throws URISyntaxException, IOException,
+            DeploymentException,
+            KeyManagementException,
             NoSuchAlgorithmException, InterruptedException, AuthenticationException {
-        Client client = new Client(createInsecureSocketContainer(),
-                SslUtils.createInsecureHttpClient("root", "foobar"),
-                "wss://localhost:9090/cockpit",
-                new NoopMessageHandler());
+        Client client = createInsecureClient(new NoopMessageHandler());
         client.connect();
-        client.sendMessage("{\"command\":\"init\",\"version\":1 }");
     }
 
-    private WebSocketContainer createInsecureSocketContainer() throws NoSuchAlgorithmException, KeyManagementException {
-        ClientManager client = ClientManager.createClient();
-        SslEngineConfigurator sslEngineConfigurator = new SslEngineConfigurator(SslUtils.createInsecureSslContext());
-        sslEngineConfigurator.setHostnameVerifier(new SslUtils.AnyHostNameVerifier());
-        client.getProperties().put(ClientProperties.SSL_ENGINE_CONFIGURATOR, sslEngineConfigurator);
-        client.getProperties().put(ClientProperties.LOG_HTTP_UPGRADE, true);
-        return client;
+    @Test
+    public void shouldOpenDbusChannel()
+            throws NoSuchAlgorithmException, KeyManagementException, IOException, DeploymentException,
+            AuthenticationException, URISyntaxException, InterruptedException {
+        BlockingQueue<String> queue = new LinkedBlockingQueue(10000);
+        Client client = createInsecureClient(new QueuingMessageHandler(queue));
+        client.connect();
+
+        client.sendMessage(ControlCommandFactory.init());
+        client.sendMessage(DbusOpenCommandBuilder.builder().internal().name(null).channel("test").host("localhost")
+                .build());
+        assertThat(JsonPath.read(poll(queue), "$.command")).isEqualTo("init");
+        assertThat(JsonPath.read(poll(queue), "$.command")).isEqualTo("ready");
+        client.sendMessage(ControlCommandFactory.close("test"));
+        client.sendMessage(ControlCommandFactory.disconnect());
     }
 }

@@ -101,6 +101,7 @@ public class Client extends javax.websocket.Endpoint {
     }
 
     public void sendMessage(String message) {
+        log.debug("Sending {}", message);
         this.userSession.getAsyncRemote().sendText(message);
     }
 
