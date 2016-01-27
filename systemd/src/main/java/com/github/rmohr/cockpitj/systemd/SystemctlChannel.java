@@ -61,19 +61,27 @@ public class SystemctlChannel {
     }
 
     public List<Unit> getLoadedUnits() throws JsonProcessingException, ChannelClosedException {
-        client.sendMessage(DbusCallBuilder.builder().id(UUID.randomUUID().toString())
-                .method("ListUnits")
-                .dbusInterface("org.freedesktop.systemd1.Manager")
-                .path("/org/freedesktop/systemd1")
-                .channel(receiver.getChannelId())
-                .build());
-        String message = receiver.pollMessage(timeout, timeUnit);
-        if (message == null) {
-            throw new ChannelClosedException();
+        final String uuid = UUID.randomUUID().toString();
+        String message;
+        while(true) {
+            client.sendMessage(DbusCallBuilder.builder()
+                    .id(uuid)
+                    .method("ListUnits")
+                    .dbusInterface("org.freedesktop.systemd1.Manager")
+                    .path("/org/freedesktop/systemd1")
+                    .channel(receiver.getChannelId())
+                    .build());
+            message = receiver.pollMessage(timeout, timeUnit);
+            if (message == null) {
+                throw new ChannelClosedException();
+            }
+            String id = JsonPath.using(config).parse(message).read("$.id");
+            if (id != null && id.equals(uuid)) {
+               break;
+            }
         }
 
-        TypeRef<List<Unit>> type = new TypeRef<List<Unit>>() {
-        };
+        TypeRef<List<Unit>> type = new TypeRef<List<Unit>>() {};
         return JsonPath.using(config).parse(message).read("$.reply[*][*][*]", type);
     }
 
