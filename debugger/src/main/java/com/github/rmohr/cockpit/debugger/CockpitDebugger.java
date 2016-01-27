@@ -15,8 +15,9 @@ import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.client.ClientProperties;
 import org.glassfish.tyrus.client.SslEngineConfigurator;
 
-import com.github.rmohr.cockpit.client.Client;
-import com.github.rmohr.cockpit.client.SslUtils;
+import com.github.rmohr.cockpitj.core.Client;
+import com.github.rmohr.cockpitj.core.SslUtils;
+import com.github.rmohr.cockpitj.core.handler.StdoutMessageHandler;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -28,15 +29,15 @@ public class CockpitDebugger {
         final String url = System.getProperty("url", "wss://localhost:9090/cockpit");
         final String user = System.getProperty("user", "root");
         final String password = System.getProperty("password", "foobar");
-        final String checkCertifiactes = System.getProperty("checkCertificates", "false");
+        final String checkCertifiactes = System.getProperty("checkCertificates", "false").trim().toLowerCase();
         Client clientEndpoint;
-        if (checkCertifiactes.equals(true)) {
-            clientEndpoint = new Client(url, user, password, new ConsoleMessageHandler());
+        if (checkCertifiactes.equals("true")) {
+            clientEndpoint = new Client(url, user, password, new StdoutMessageHandler());
         } else {
             clientEndpoint = new Client(createInsecureSocketContainer(),
                     SslUtils.createInsecureHttpClient(user, password),
                     url,
-                    new ConsoleMessageHandler());
+                    new StdoutMessageHandler());
         }
         clientEndpoint.connect();
 
@@ -48,6 +49,8 @@ public class CockpitDebugger {
             if (line.equals("---")) {
                 clientEndpoint.sendMessage(message);
                 message = "";
+            } else if (line.equals("exit")) {
+                break;
             } else {
                 message = message + line + "\n";
             }

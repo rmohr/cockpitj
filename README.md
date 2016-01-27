@@ -21,15 +21,15 @@ Then include the maven dependency
 
 ```xml
 <dependency>
-    <groupId>com.github.rmohr.cockpit</groupId>
-    <artifactId>client</artifactId>
+    <groupId>com.github.rmohr.cockpitj</groupId>
+    <artifactId>core</artifactId>
     <version>1.0-SNAPSHOT</version>
 </dependency>
 ```
 
 in your project.
 
-The following example shows a minimal possible lient which reads from and writes to a terminal:
+The following example shows a minimalistic client which reads from and writes to a terminal:
 
 ```java
 import com.github.rmohr.cockpit.client.Client;
