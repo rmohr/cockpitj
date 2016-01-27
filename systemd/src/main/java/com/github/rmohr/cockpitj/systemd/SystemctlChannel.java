@@ -1,9 +1,9 @@
 package com.github.rmohr.cockpitj.systemd;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,16 +22,16 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 public class SystemctlChannel {
 
-    private final BlockingQueue<String> queue;
     private final Client client;
     private final String channel;
     private final QueuingChannelReceiver receiver;
     private TimeUnit timeUnit;
     private long timeout;
-    private Configuration config= Configuration.defaultConfiguration().mappingProvider(new JacksonMappingProvider())
-                .jsonProvider(new JacksonJsonProvider()).addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
+    private Configuration config = Configuration.defaultConfiguration().mappingProvider(new JacksonMappingProvider())
+            .jsonProvider(new JacksonJsonProvider()).addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
 
     public boolean open(String host) throws JsonProcessingException {
+        requireNonNull(host);
         client.sendMessage(DbusOpenCommandBuilder.builder()
                 .name(null)
                 .group("cockpit1:localhost/system")
@@ -42,11 +42,19 @@ public class SystemctlChannel {
         return receiver.waitForChannel(timeout, timeUnit);
     }
 
-    public SystemctlChannel(Client client, QueuingChannelReceiver receiver, int messageCapacity, long timeout, TimeUnit
-            timeUnit) {
-        queue = new LinkedBlockingDeque<>(messageCapacity);
+    public boolean open() throws JsonProcessingException {
+        client.sendMessage(DbusOpenCommandBuilder.builder()
+                .name(null)
+                .group("cockpit1:localhost/system")
+                .channel(channel)
+                .name("org.freedesktop.systemd1")
+                .build());
+        return receiver.waitForChannel(timeout, timeUnit);
+    }
+
+    public SystemctlChannel(Client client, QueuingChannelReceiver receiver, long timeout, TimeUnit timeUnit) {
         this.client = client;
-        this.channel = UUID.randomUUID().toString();
+        this.channel = receiver.getChannelId();
         this.timeout = timeout;
         this.timeUnit = timeUnit;
         this.receiver = receiver;
@@ -57,14 +65,15 @@ public class SystemctlChannel {
                 .method("ListUnits")
                 .dbusInterface("org.freedesktop.systemd1.Manager")
                 .path("/org/freedesktop/systemd1")
-                .channel("test")
+                .channel(receiver.getChannelId())
                 .build());
         String message = receiver.pollMessage(timeout, timeUnit);
         if (message == null) {
             throw new ChannelClosedException();
         }
 
-        TypeRef<List<Unit>> type = new TypeRef<List<Unit>>(){};
+        TypeRef<List<Unit>> type = new TypeRef<List<Unit>>() {
+        };
         return JsonPath.using(config).parse(message).read("$.reply[*][*][*]", type);
     }
 

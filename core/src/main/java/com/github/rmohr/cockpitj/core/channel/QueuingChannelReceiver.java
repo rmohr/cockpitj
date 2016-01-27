@@ -21,6 +21,9 @@ public class QueuingChannelReceiver extends AbstractChannelReceiverImpl implemen
     public boolean waitForChannel(long duration, TimeUnit timeUnit) {
         try {
             Message message = queue.poll(duration, timeUnit);
+            if (message == null) {
+                return false;
+            }
             if (message.isControlCommand()) {
                 switch (message.getCommand()) {
                 case ControlCommands.DONE:
@@ -60,24 +63,10 @@ public class QueuingChannelReceiver extends AbstractChannelReceiverImpl implemen
 
     @Override
     protected void doOnMessage(Message message) {
-        if (message.isControlCommand()) {
-            switch (message.getCommand()) {
-            case ControlCommands.DONE:
-            case ControlCommands.CLOSE: {
-                try {
-                    queue.put(null);
-                } catch (InterruptedException e) {
-                    log.debug("Interrupt {}", e);
-                }
-                break;
-            }
-            }
-        } else {
-            try {
-                queue.put(message);
-            } catch (InterruptedException e) {
-                log.debug("Interrupt {}", e);
-            }
+        try {
+            queue.put(message);
+        } catch (InterruptedException e) {
+            log.debug("Interrupt {}", e);
         }
     }
 }

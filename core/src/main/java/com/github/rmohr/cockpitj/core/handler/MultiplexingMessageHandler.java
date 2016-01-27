@@ -38,6 +38,8 @@ public class MultiplexingMessageHandler implements MessageHandler.Whole<String> 
             case DONE: {
                 if (channels.containsKey(message.getChannel())) {
                     channels.get(message.getChannel()).onMessage(message);
+                } else {
+                    log.warn("Message for not registerd channel '{}' received", message.getChannel());
                 }
                 break;
             }
@@ -51,6 +53,12 @@ public class MultiplexingMessageHandler implements MessageHandler.Whole<String> 
             default: {
                 break;
             }
+            }
+        } else {
+            if (channels.containsKey(message.getChannel())) {
+                channels.get(message.getChannel()).onMessage(message);
+            } else {
+                log.warn("Message for not registered channel '{}' received", message.getChannel());
             }
         }
 
@@ -73,18 +81,16 @@ public class MultiplexingMessageHandler implements MessageHandler.Whole<String> 
     }
 
     protected Message extractMessage(String message) {
-        String[] splittedMessage = message.split("\n", 1);
-        if (!message.contains("\n") || splittedMessage.length == 2 && splittedMessage[1].isEmpty()) {
+        String[] splittedMessage = message.split("\\n", 2);
+        if (!message.contains("\n") || splittedMessage[1].isEmpty()) {
             return Message.builder().body(message).valid(false).build();
         }
-        if (splittedMessage.length == 1) {
-            String command = JsonPath.using(config).parse(splittedMessage[0]).read("$.command");
-            String channelId = "";
-            if (ControlCommands.channelCommands.contains(channelId)) {
-                channelId = JsonPath.using(config).parse(splittedMessage[0]).read("$.channel");
-            }
-            return Message.builder().channel(channelId).controlCommand(true).body(splittedMessage[0])
-                    .command(command).valid(command == null).build();
+        if (splittedMessage[0].isEmpty()) {
+            String command = JsonPath.using(config).parse(splittedMessage[1]).read("$.command");
+            String channelId = JsonPath.using(config).parse(splittedMessage[1]).read("$.channel");
+            return Message.builder().channel(channelId != null ? channelId : "").controlCommand(true).body
+                    (splittedMessage[1])
+                    .command(command).valid(command != null).build();
         } else {
             String channelId = splittedMessage[0];
             String body = splittedMessage[1];
